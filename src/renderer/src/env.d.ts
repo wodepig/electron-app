@@ -1,1 +1,110 @@
 /// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_APP_NAME?: string
+  readonly VITE_APP_ICON?: string
+  readonly VITE_APP_DESC?: string
+  readonly VITE_APP_HOME?: string
+  readonly VITE_APP_AUTHOR_NAME?: string
+  readonly VITE_APP_AUTHOR_EMAIL?: string
+  readonly VITE_APP_AUTHOR_WEBSITE?: string
+  readonly VITE_APP_AUTHOR_GITHUB?: string
+  readonly VITE_APP_AUTHOR_QRCODE?: string
+  readonly VITE_APP_AUTHOR_QRLABEL?: string
+  readonly VITE_APP_LINKS?: string
+  // more env variables...
+}
+// 应用的信息
+type AppInfo = {
+  name:string
+  desc:string
+  icon:string
+  links: LinkInfo[]
+  auth: AuthorInfo
+}
+
+type AuthorInfo = {
+  name?: string
+  email?: string
+  website?: string
+  wx?: string
+  github?: string
+  qrCode?: string
+  qrLabel?: string
+}
+
+type LinkInfo = {
+  name: string
+  url: string
+  icon?: string
+}
+
+type DownloadProgressPayload = {
+  visible: boolean
+  progress: number
+  isDownloading: boolean
+}
+
+type InitProgressPayload = {
+  progress: number
+  message: string
+}
+
+type SystemVersion = {
+  platform: string
+  arch: string
+  language: string
+  appVersion: string
+  electronVersion: string
+  chromeVersion: string
+  nodeVersion: string
+}
+
+type NotificationData = {
+  id: string
+  type: 'info' | 'success' | 'warning' | 'error'
+  title: string
+  message: string
+  duration: number
+  timestamp: number
+}
+
+interface Window {
+  electron?: any
+  api?: {
+    onUpdateLog?: (callback: (log: string) => void) => void
+    removeUpdateLogListener?: () => void
+    checkPortInUse?: (port: number) => Promise<any>
+    getSystemVersions?: () => SystemVersion
+    getAppInfos?: () => AppInfo
+    onLatestLog?: (callback:(log:string) => void) => void
+    onNavigate?: (callback: (path: string) => void) => void
+    removeNavigateListener?: () => void
+    onDownloadProgress?: (callback: (payload: DownloadProgressPayload) => void) => void
+    removeDownloadProgressListener?: () => void
+    getSettings?: () => Promise<{
+      updateFrequency: string
+      startupActions: string[]
+      browserType: string
+    }>
+    saveSettings?: (settings: {
+      updateFrequency: string
+      startupActions: string[]
+      browserType?: string
+    }) => Promise<{ success: boolean }>
+    resetSettings?: () => Promise<{
+      success: boolean
+      settings?: {
+        updateFrequency: string
+        startupActions: string[]
+        browserType: string
+      }
+      error?: string
+    }>
+    onInitProgress?: (callback: (payload: InitProgressPayload) => void) => void
+    removeInitProgressListener?: () => void
+    onAppNotification?: (callback: (data: NotificationData) => void) => void
+    removeAppNotificationListener?: () => void
+    showNotification?: (type: 'info' | 'success' | 'warning' | 'error', title: string, message: string, duration?: number) => Promise<void>
+  }
+}

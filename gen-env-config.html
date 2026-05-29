@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Env配置生成器</title>
+  <!-- 引入Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 引入Font Awesome -->
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+  <!-- Tailwind配置 -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#3b82f6',
+            secondary: '#64748b',
+            accent: '#10b981',
+            dark: '#1e293b',
+            light: '#f8fafc',
+            danger: '#ef4444',
+            hint: '#94a3b8' // 提示文本颜色
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      }
+    }
+  </script>
+
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .config-card {
+        @apply bg-white rounded-lg shadow-md p-6 mb-6 transition-all hover:shadow-lg;
+      }
+      .form-label {
+        @apply block text-sm font-medium text-gray-700;
+      }
+      .form-label-required {
+        @apply form-label after:content-['*'] after:text-danger after:ml-1;
+      }
+      .form-hint {
+        @apply block text-xs text-hint mb-2; /* 提示文本样式 */
+      }
+      .form-input {
+        @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors;
+      }
+      .form-input-error {
+        @apply border-danger focus:ring-danger/50 focus:border-danger;
+      }
+      .error-text {
+        @apply text-danger text-xs mt-1 hidden;
+      }
+      .error-text.show {
+        @apply block;
+      }
+      .section-title {
+        @apply text-lg font-semibold text-dark mb-4 flex items-center gap-2;
+      }
+      .btn {
+        @apply px-4 py-2 rounded-md font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2;
+      }
+      .btn-primary {
+        @apply bg-primary text-white hover:bg-primary/90 focus:ring-primary/50;
+      }
+      .btn-secondary {
+        @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-400;
+      }
+      .btn-danger {
+        @apply bg-danger text-white hover:bg-danger/90 focus:ring-danger/50;
+      }
+      .action-btn {
+        @apply flex flex-col gap-4; /* 按钮区布局 */
+      }
+      .link-row {
+        @apply flex gap-3 items-end mb-3;
+      }
+      .link-row-input {
+        @apply flex-1;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+  <div class=" mx-auto px-40 py-8"> <!-- 加宽容器适配三列布局 -->
+    <header class="text-center mb-8">
+      <h1 class="text-[clamp(1.8rem,4vw,2.5rem)] font-bold text-dark mb-2">Env配置生成器</h1>
+      <p class="text-secondary">轻松生成和管理你的环境配置文件</p>
+    </header>
+
+    <!-- 预设选择区 -->
+    <div class="mb-6">
+      <section class="config-card">
+        <h2 class="section-title">
+          <i class="fa fa-bookmark text-primary"></i> 快捷预设
+        </h2>
+        <div class="flex gap-3 flex-wrap">
+          <button type="button" class="btn btn-secondary preset-btn" data-preset="demo">
+            <i class="fa fa-robot mr-1"></i> 演示
+          </button>
+          <button type="button" class="btn btn-secondary preset-btn" data-preset="xiyin">
+            <i class="fa fa-magic mr-1"></i> 希音
+          </button>
+          <button type="button" class="btn btn-secondary preset-btn" data-preset="rpa">
+            <i class="fa fa-robot mr-1"></i> RPA工具
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <!-- 左中右三列布局：预览区 | 配置区 | 按钮区 -->
+    <div class="flex flex-col lg:flex-row gap-6">
+      <!-- 左侧：预览区（固定宽度） -->
+      <div class="w-full lg:w-1/4">
+        <section class="config-card h-full sticky top-8"> <!-- 粘性布局，滚动时固定 -->
+          <h2 class="section-title">
+            <i class="fa fa-eye text-primary"></i> 配置文件预览
+          </h2>
+          <div class="flex items-center mb-3 flex-wrap">
+            <label class="form-label mr-2">文件名：</label>
+            <input type="text" id="fileName" value=".env" class="form-input w-32 mb-2 sm:mb-0">
+            <p class="form-hint ml-2">配置文件的名称，默认.env</p>
+          </div>
+          <div class="relative">
+            <pre id="configPreview"
+              class="bg-gray-900 text-gray-100 p-4 rounded-md overflow-auto h-96 whitespace-pre-wrap"></pre>
+            <button id="copyBtn" class="btn btn-secondary absolute top-2 right-2 text-sm">
+              <i class="fa fa-copy mr-1"></i> 复制
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- 中间：配置区（弹性宽度，主要内容区） -->
+      <div class="w-full lg:flex-1">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- UpgradeLink配置区 -->
+          <section class="config-card">
+            <h2 class="section-title">
+              <i class="fa fa-link text-primary"></i> UpgradeLink配置
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label for="VITE_UL_CONF_AK" class="form-label-required">VITE_UL_CONF_AK</label>
+                <p class="form-hint">UpgradeLink平台中的Ak</p>
+                <input type="text" id="VITE_UL_CONF_AK" class="form-input">
+                <p class="error-text" id="VITE_UL_CONF_AK_error">请填写UpgradeLink平台的AK</p>
+              </div>
+              <div>
+                <label for="VITE_UL_CONF_SK" class="form-label-required">VITE_UL_CONF_SK</label>
+                <p class="form-hint">UpgradeLink平台中的SK</p>
+                <input type="text" id="VITE_UL_CONF_SK" class="form-input">
+                <p class="error-text" id="VITE_UL_CONF_SK_error">请填写UpgradeLink平台的SK</p>
+              </div>
+              <div>
+                <label for="VITE_UL_CONF_FILEKEY" class="form-label-required">VITE_UL_CONF_FILEKEY</label>
+                <p class="form-hint">UpgradeLink平台中的FileKey</p>
+                <input type="text" id="VITE_UL_CONF_FILEKEY" class="form-input">
+                <p class="error-text" id="VITE_UL_CONF_FILEKEY_error">请填写UpgradeLink平台的FileKey</p>
+              </div>
+              <div>
+                <label for="VITE_UL_CONF_URL" class="form-label-required">VITE_UL_CONF_URL</label>
+                <p class="form-hint">程序启动后打开的地址，默认http://localhost:3000</p>
+                <input type="text" id="VITE_UL_CONF_URL" class="form-input" value="http://localhost:3000">
+                <p class="error-text" id="VITE_UL_CONF_URL_error">请填写程序启动后打开的地址</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 应用基本配置区 -->
+          <section class="config-card">
+            <h2 class="section-title">
+              <i class="fa fa-cog text-primary"></i> 应用基本配置
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label for="VITE_APP_NAME" class="form-label-required">VITE_APP_NAME</label>
+                <p class="form-hint">应用名，默认是压缩包名称和exe的名称</p>
+                <input type="text" id="VITE_APP_NAME" class="form-input" value="希音工具">
+                <p class="error-text" id="VITE_APP_NAME_error">请填写应用名称</p>
+              </div>
+              <div>
+                <label for="VITE_APP_EXE_NAME" class="form-label-required">VITE_APP_EXE_NAME</label>
+                <p class="form-hint">单独指定exe名称,也是窗口的标题名</p>
+                <input type="text" id="VITE_APP_EXE_NAME" class="form-input" value="希音工具">
+                <p class="error-text" id="VITE_APP_EXE_NAME_error">请填写单独指定的exe名称</p>
+              </div>
+              <div>
+                <label for="VITE_APP_DESC" class="form-label-required">VITE_APP_DESC</label>
+                <p class="form-hint">应用描述</p>
+                <input type="text" id="VITE_APP_DESC" class="form-input" value="希音自动化工具">
+                <p class="error-text" id="VITE_APP_DESC_error">请填写应用描述</p>
+              </div>
+              <div>
+                <label for="VITE_APP_ID" class="form-label-required">VITE_APP_ID</label>
+                <p class="form-hint">应用的appId</p>
+                <input type="text" id="VITE_APP_ID" class="form-input" value="electron.xxdl.xyz">
+                <p class="error-text" id="VITE_APP_ID_error">请填写应用的appId</p>
+              </div>
+              <div>
+                <label for="VITE_APP_ICON" class="form-label-required">VITE_APP_ICON</label>
+                <p class="form-hint">应用图标路径，默认image/icon.png</p>
+                <input type="text" id="VITE_APP_ICON" class="form-input" value="image/shein.png">
+                <p class="error-text" id="VITE_APP_ICON_error">请填写应用图标路径</p>
+              </div>
+              <div>
+                <label for="VITE_APP_HOME" class="form-label-required">VITE_APP_HOME</label>
+                <p class="form-hint">应用主页</p>
+                <input type="text" id="VITE_APP_HOME" class="form-input">
+                <p class="error-text" id="VITE_APP_HOME_error">请填写应用主页地址</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 作者信息配置区 -->
+          <section class="config-card">
+            <h2 class="section-title">
+              <i class="fa fa-user text-primary"></i> 作者信息配置
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label for="VITE_AUTHOR_NAME" class="form-label-required">VITE_AUTHOR_NAME</label>
+                <p class="form-hint">作者名称</p>
+                <input type="text" id="VITE_AUTHOR_NAME" class="form-input" value="筱筱">
+                <p class="error-text" id="VITE_AUTHOR_NAME_error">请填写作者名称</p>
+              </div>
+              <div>
+                <label for="VITE_AUTHOR_WX" class="form-label-required">VITE_AUTHOR_WX</label>
+                <p class="form-hint">作者微信</p>
+                <input type="text" id="VITE_AUTHOR_WX" class="form-input" value="xxdlovo">
+                <p class="error-text" id="VITE_AUTHOR_WX_error">请填写作者微信</p>
+              </div>
+              <div>
+                <label for="VITE_AUTHOR_WX_IMG" class="form-label-required">VITE_AUTHOR_WX_IMG</label>
+                <p class="form-hint">作者微信二维码的图片名，需要放在image/中</p>
+                <input type="text" id="VITE_AUTHOR_WX_IMG" class="form-input" value="image/wx_qr.png">
+                <p class="error-text" id="VITE_AUTHOR_WX_IMG_error">请填写作者微信二维码的图片名</p>
+              </div>
+              <div>
+                <label for="VITE_AUTHOR_EMAIL" class="form-label-required">VITE_AUTHOR_EMAIL</label>
+                <p class="form-hint">作者邮箱</p>
+                <input type="email" id="VITE_AUTHOR_EMAIL" class="form-input" value="dddgoal@163.com">
+                <p class="error-text" id="VITE_AUTHOR_EMAIL_error">请填写有效的作者邮箱</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 系统配置区 -->
+          <section class="config-card">
+            <h2 class="section-title">
+              <i class="fa fa-shield text-primary"></i> 系统配置
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <label for="VITE_ADMIN_PASSWORD" class="form-label-required">VITE_ADMIN_PASSWORD</label>
+                <p class="form-hint">控制台的管理密码</p>
+                <input id="VITE_ADMIN_PASSWORD" class="form-input" value="123456">
+                <p class="error-text" id="VITE_ADMIN_PASSWORD_error">请设置控制台管理密码</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 应用链接配置区（独立分区） -->
+          <section class="config-card lg:col-span-2">
+            <h2 class="section-title">
+              <i class="fa fa-bookmark text-primary"></i> 应用链接配置
+            </h2>
+            <p class="form-hint mb-4">每行包含图标、标题、链接，自动拼接为 VITE_APP_LINKS 配置值（格式：图标|标题|链接;图标|标题|链接），所有字段均为必填</p>
+
+            <!-- 链接行容器 -->
+            <div id="linksContainer" class="mb-4">
+              <!-- 初始行 -->
+              <div class="link-row">
+                <div class="link-row-input">
+                  <label class="form-label-required">emoji图标</label>
+                  <p class="form-hint">如😀🙃</p>
+                  <input type="text" class="form-input link-icon" value="😀">
+                  <p class="error-text link-icon-error">请填写emoji图标</p>
+                </div>
+                <div class="link-row-input">
+                  <label class="form-label-required">链接标题</label>
+                  <p class="form-hint">链接的显示标题，例如：使用文档</p>
+                  <input type="text" class="form-input link-title" value="使用文档">
+                  <p class="error-text link-title-error">请填写链接标题</p>
+                </div>
+                <div class="link-row-input">
+                  <label class="form-label-required">链接地址</label>
+                  <p class="form-hint">链接的URL地址，例如：https://docs.example.com</p>
+                  <input type="text" class="form-input link-url"
+                    value="https://dcnjo468lptb.feishu.cn/wiki/G5i9wLMnNi6UCbke223caiGCnyg">
+                  <p class="error-text link-url-error">请填写链接地址</p>
+                </div>
+                <button type="button" class="btn btn-danger delete-row" style="padding: 0.5rem 1rem;">
+                  <i class="fa fa-trash"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- 新增行按钮 -->
+            <button type="button" id="addLinkRow" class="btn btn-secondary">
+              <i class="fa fa-plus mr-1"></i> 新增链接行
+            </button>
+
+            <!-- 隐藏的VITE_APP_LINKS输入框（用于生成配置） -->
+            <input type="hidden" id="VITE_APP_LINKS">
+          </section>
+        </div>
+      </div>
+
+      <!-- 右侧：按钮区（固定宽度，粘性布局） -->
+      <div class="w-full lg:w-1/6">
+        <div class="action-btn sticky top-8">
+          <button id="resetBtn" class="btn btn-secondary w-full">
+            <i class="fa fa-refresh mr-1"></i> 重置
+          </button>
+          <button id="saveBtn" class="btn btn-primary w-full">
+            <i class="fa fa-save mr-1"></i> 保存配置
+          </button>
+          <!-- 可扩展添加更多按钮 -->
+          <button id="previewBtn" class="btn btn-secondary w-full">
+            <i class="fa fa-eye mr-1"></i> 刷新预览
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 配置项列表（包含隐藏的VITE_APP_LINKS）
+    const configItems = [
+      'VITE_UL_CONF_AK', 'VITE_UL_CONF_SK', 'VITE_UL_CONF_FILEKEY', 'VITE_UL_CONF_URL',
+      'VITE_APP_NAME', 'VITE_APP_EXE_NAME', 'VITE_APP_DESC', 'VITE_APP_ID', 'VITE_APP_ICON',
+      'VITE_APP_HOME', 'VITE_APP_LINKS', 'VITE_AUTHOR_NAME', 'VITE_AUTHOR_WX',
+      'VITE_AUTHOR_WX_IMG', 'VITE_AUTHOR_EMAIL', 'VITE_ADMIN_PASSWORD'
+    ];
+
+    // 预设配置
+    const presets = {
+      demo: {
+        VITE_UL_CONF_AK: 'DZy7DLZJHnEVfgPIeFkvPA',
+        VITE_UL_CONF_SK: 'kKezJ_blUGmk6jr7TZm21Fo_OnrTAR1YgFoLvc51O4Q',
+        VITE_UL_CONF_FILEKEY: '1N7G2fa6ngav62X4lVMIsA',
+        VITE_UL_CONF_URL: 'http://localhost:3000',
+        VITE_APP_NAME: '演示',
+        VITE_APP_EXE_NAME: '演示',
+        VITE_APP_DESC: '演示',
+        VITE_APP_ID: 'demo.xxdl.xyz',
+        VITE_APP_ICON: 'image/electron.png',
+        VITE_APP_HOME: 'https://dcnjo468lptb.feishu.cn/wiki/Gtq7wZSVzipN17k1NSacffB3nad',
+        VITE_AUTHOR_NAME: '筱筱',
+        VITE_AUTHOR_WX: 'xxdlovo',
+        VITE_AUTHOR_WX_IMG: 'image/wx_blank.png',
+        VITE_AUTHOR_EMAIL: 'dddgoal@163.com',
+        VITE_ADMIN_PASSWORD: '123456',
+        links: [
+          { icon: '😀', title: '关于我', url: 'https://dcnjo468lptb.feishu.cn/wiki/Gtq7wZSVzipN17k1NSacffB3nad' }
+        ]
+      },
+      xiyin: {
+        VITE_UL_CONF_URL: 'http://localhost:3000',
+        VITE_APP_NAME: '希音工具',
+        VITE_APP_EXE_NAME: '希音工具',
+        VITE_APP_DESC: '希音自动化工具',
+        VITE_APP_ID: 'electron.xxdl.xyz',
+        VITE_APP_ICON: 'image/shein.png',
+        VITE_AUTHOR_NAME: '筱筱',
+        VITE_AUTHOR_WX: 'xxdlovo',
+        VITE_AUTHOR_WX_IMG: 'image/wx_qr.png',
+        VITE_AUTHOR_EMAIL: 'dddgoal@163.com',
+        VITE_ADMIN_PASSWORD: '123456',
+        links: [
+          { icon: '😀', title: '使用文档', url: 'https://dcnjo468lptb.feishu.cn/wiki/G5i9wLMnNi6UCbke223caiGCnyg' }
+        ]
+      },
+      rpa: {
+        VITE_UL_CONF_URL: 'http://localhost:3000',
+        VITE_APP_NAME: 'RPA工具',
+        VITE_APP_EXE_NAME: 'RPA工具',
+        VITE_APP_DESC: 'RPA自动化工具',
+        VITE_APP_ID: 'electron.rpa.tools',
+        VITE_APP_ICON: 'image/rpa.png',
+        VITE_AUTHOR_NAME: '筱筱',
+        VITE_AUTHOR_WX: 'xxdlovo',
+        VITE_AUTHOR_WX_IMG: 'image/wx_qr.png',
+        VITE_AUTHOR_EMAIL: 'dddgoal@163.com',
+        VITE_ADMIN_PASSWORD: '123456',
+        links: [
+          { icon: '🤖', title: 'RPA文档', url: 'https://docs.rpa.example.com' }
+        ]
+      }
+    };
+
+    // 加载预设（优先加载自定义配置，没有则加载默认配置）
+    function loadPreset(presetName) {
+      // 先尝试加载该预设的自定义配置
+      const customConfig = loadPresetConfig(presetName);
+
+      if (customConfig) {
+        // 加载自定义配置
+        if (customConfig.fileName) {
+          document.getElementById('fileName').value = customConfig.fileName;
+        }
+
+        // 加载所有配置数据
+        if (customConfig.data) {
+          Object.keys(customConfig.data).forEach(key => {
+            if (key === 'links') return;
+            const input = document.getElementById(key);
+            if (input) {
+              input.value = customConfig.data[key];
+              input.classList.remove('form-input-error');
+              const errorText = document.getElementById(`${key}_error`);
+              if (errorText) errorText.classList.remove('show');
+            }
+          });
+        }
+
+        // 加载链接配置
+        const linksContainer = document.getElementById('linksContainer');
+        linksContainer.innerHTML = '';
+
+        if (customConfig.data && customConfig.data.links && customConfig.data.links.length > 0) {
+          customConfig.data.links.forEach(link => {
+            const newRow = document.createElement('div');
+            newRow.className = 'link-row';
+            newRow.innerHTML = `
+            <div class="link-row-input">
+              <label class="form-label-required">emoji图标</label>
+              <p class="form-hint">如😀🙃</p>
+              <input type="text" class="form-input link-icon" value="${link.icon || ''}">
+              <p class="error-text link-icon-error">请填写emoji图标</p>
+            </div>
+            <div class="link-row-input">
+              <label class="form-label-required">链接标题</label>
+              <p class="form-hint">链接的显示标题，例如：使用文档</p>
+              <input type="text" class="form-input link-title" value="${link.title || ''}">
+              <p class="error-text link-title-error">请填写链接标题</p>
+            </div>
+            <div class="link-row-input">
+              <label class="form-label-required">链接地址</label>
+              <p class="form-hint">链接的URL地址，例如：https://docs.example.com</p>
+              <input type="text" class="form-input link-url" value="${link.url || ''}">
+              <p class="error-text link-url-error">请填写链接地址</p>
+            </div>
+            <button type="button" class="btn btn-danger delete-row" style="padding: 0.5rem 1rem;">
+              <i class="fa fa-trash"></i>
+            </button>
+          `;
+            linksContainer.appendChild(newRow);
+
+            // 绑定删除事件
+            newRow.querySelector('.delete-row').addEventListener('click', function () {
+              if (document.querySelectorAll('.link-row').length > 1) {
+                newRow.remove();
+                updatePreview();
+                saveToLocalStorage();
+              } else {
+                alert('至少需要保留一行链接配置');
+              }
+            });
+
+            // 绑定输入事件
+            bindLinkRowInputEvents(newRow);
+          });
+        }
+      } else {
+        // 没有自定义配置，加载默认预设
+        const preset = presets[presetName];
+        if (!preset) return;
+
+        // 填充普通配置项
+        Object.keys(preset).forEach(key => {
+          if (key === 'links') return;
+          const input = document.getElementById(key);
+          if (input) {
+            input.value = preset[key];
+            input.classList.remove('form-input-error');
+            const errorText = document.getElementById(`${key}_error`);
+            if (errorText) errorText.classList.remove('show');
+          }
+        });
+
+        // 清空并重新填充链接配置
+        const linksContainer = document.getElementById('linksContainer');
+        linksContainer.innerHTML = '';
+
+        preset.links.forEach(link => {
+          const newRow = document.createElement('div');
+          newRow.className = 'link-row';
+          newRow.innerHTML = `
+          <div class="link-row-input">
+            <label class="form-label-required">emoji图标</label>
+            <p class="form-hint">如😀🙃</p>
+            <input type="text" class="form-input link-icon" value="${link.icon}">
+            <p class="error-text link-icon-error">请填写emoji图标</p>
+          </div>
+          <div class="link-row-input">
+            <label class="form-label-required">链接标题</label>
+            <p class="form-hint">链接的显示标题，例如：使用文档</p>
+            <input type="text" class="form-input link-title" value="${link.title}">
+            <p class="error-text link-title-error">请填写链接标题</p>
+          </div>
+          <div class="link-row-input">
+            <label class="form-label-required">链接地址</label>
+            <p class="form-hint">链接的URL地址，例如：https://docs.example.com</p>
+            <input type="text" class="form-input link-url" value="${link.url}">
+            <p class="error-text link-url-error">请填写链接地址</p>
+          </div>
+          <button type="button" class="btn btn-danger delete-row" style="padding: 0.5rem 1rem;">
+            <i class="fa fa-trash"></i>
+          </button>
+        `;
+          linksContainer.appendChild(newRow);
+
+          // 绑定删除事件
+          newRow.querySelector('.delete-row').addEventListener('click', function () {
+            if (document.querySelectorAll('.link-row').length > 1) {
+              newRow.remove();
+              updatePreview();
+              saveToLocalStorage();
+            } else {
+              alert('至少需要保留一行链接配置');
+            }
+          });
+
+          // 绑定输入事件
+          bindLinkRowInputEvents(newRow);
+        });
+      }
+
+      // 重新绑定所有删除事件
+      bindDeleteRowEvents();
+
+      // 保存加载的预设到 LocalStorage（带预设名称）
+      saveToLocalStorage(presetName);
+
+      updatePreview();
+    }
+
+    // 所有配置项设为必填（包含普通项和邮箱格式项）
+    const requiredFields = [
+      { id: 'VITE_UL_CONF_AK', rule: 'required', message: '请填写UpgradeLink平台的AK' },
+      { id: 'VITE_UL_CONF_SK', rule: 'required', message: '请填写UpgradeLink平台的SK' },
+      { id: 'VITE_UL_CONF_FILEKEY', rule: 'required', message: '请填写UpgradeLink平台的FileKey' },
+      { id: 'VITE_UL_CONF_URL', rule: 'required', message: '请填写程序启动后打开的地址' },
+      { id: 'VITE_APP_NAME', rule: 'required', message: '请填写应用名称' },
+      { id: 'VITE_APP_EXE_NAME', rule: 'required', message: '请填写单独指定的exe名称' },
+      { id: 'VITE_APP_DESC', rule: 'required', message: '请填写应用描述' },
+      { id: 'VITE_APP_ID', rule: 'required', message: '请填写应用的appId' },
+      { id: 'VITE_APP_ICON', rule: 'required', message: '请填写应用图标路径' },
+      { id: 'VITE_APP_HOME', rule: 'required', message: '请填写应用主页地址' },
+      { id: 'VITE_AUTHOR_NAME', rule: 'required', message: '请填写作者名称' },
+      { id: 'VITE_AUTHOR_WX', rule: 'required', message: '请填写作者微信' },
+      { id: 'VITE_AUTHOR_WX_IMG', rule: 'required', message: '请填写作者微信二维码的图片名' },
+      { id: 'VITE_AUTHOR_EMAIL', rule: 'email', message: '请填写有效的作者邮箱' },
+      { id: 'VITE_ADMIN_PASSWORD', rule: 'required', message: '请设置控制台管理密码' }
+    ];
+
+    // 生成链接配置字符串并校验链接行
+    function generateLinksConfig() {
+      const linkRows = document.querySelectorAll('.link-row');
+      const links = [];
+      let isLinksValid = true;
+
+      // 清除所有链接行的错误提示
+      linkRows.forEach(row => {
+        row.querySelector('.link-icon').classList.remove('form-input-error');
+        row.querySelector('.link-title').classList.remove('form-input-error');
+        row.querySelector('.link-url').classList.remove('form-input-error');
+        row.querySelector('.link-icon-error').classList.remove('show');
+        row.querySelector('.link-title-error').classList.remove('show');
+        row.querySelector('.link-url-error').classList.remove('show');
+      });
+
+      // 校验并拼接链接行
+      linkRows.forEach(row => {
+        const icon = row.querySelector('.link-icon').value.trim();
+        const title = row.querySelector('.link-title').value.trim();
+        const url = row.querySelector('.link-url').value.trim();
+        const iconError = row.querySelector('.link-icon-error');
+        const titleError = row.querySelector('.link-title-error');
+        const urlError = row.querySelector('.link-url-error');
+
+        // 校验链接行的必填项
+        if (!icon) {
+          row.querySelector('.link-icon').classList.add('form-input-error');
+          iconError.classList.add('show');
+          isLinksValid = false;
+        }
+        if (!title) {
+          row.querySelector('.link-title').classList.add('form-input-error');
+          titleError.classList.add('show');
+          isLinksValid = false;
+        }
+        if (!url) {
+          row.querySelector('.link-url').classList.add('form-input-error');
+          urlError.classList.add('show');
+          isLinksValid = false;
+        }
+
+        // 只有所有字段都有值时才加入
+        if (icon && title && url) {
+          links.push(`${icon}|${title}|${url}`);
+        }
+      });
+
+      // 将拼接结果写入隐藏输入框
+      const linksConfig = links.join(';');
+      document.getElementById('VITE_APP_LINKS').value = linksConfig;
+
+      // 返回拼接结果和校验状态
+      return { config: linksConfig, valid: isLinksValid };
+    }
+
+    // 初始化预览
+    function updatePreview() {
+      // 先生成链接配置（不校验，仅更新预览）
+      const { config } = generateLinksConfig();
+
+      let configContent = '';
+      configItems.forEach(key => {
+        const value = document.getElementById(key).value.trim();
+        if (value) {
+          configContent += `${key}=${value}\n`;
+        }
+      });
+      document.getElementById('configPreview').textContent = configContent || '# 请填写配置项以生成内容';
+    }
+
+    // 全局表单校验函数
+    function validateForm() {
+      let isValid = true;
+
+      // 清除所有普通项错误提示
+      requiredFields.forEach(field => {
+        const input = document.getElementById(field.id);
+        const errorText = document.getElementById(`${field.id}_error`);
+        if (input) {
+          input.classList.remove('form-input-error');
+          if (errorText) errorText.classList.remove('show');
+        }
+      });
+
+      // 校验普通必填项
+      requiredFields.forEach(field => {
+        const input = document.getElementById(field.id);
+        if (!input) return;
+
+        const value = input.value.trim();
+        const errorText = document.getElementById(`${field.id}_error`);
+
+        // 非空校验
+        if (field.rule === 'required' && !value) {
+          input.classList.add('form-input-error');
+          errorText.textContent = field.message;
+          errorText.classList.add('show');
+          isValid = false;
+        }
+
+        // 邮箱格式校验
+        if (field.rule === 'email' && value) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            input.classList.add('form-input-error');
+            errorText.textContent = field.message;
+            errorText.classList.add('show');
+            isValid = false;
+          }
+        }
+      });
+
+      // 校验链接配置行
+      const { valid: linksValid } = generateLinksConfig();
+      if (!linksValid) {
+        isValid = false;
+      }
+
+      return isValid;
+    }
+
+    // 复制配置内容
+    function copyConfig() {
+      const preview = document.getElementById('configPreview');
+      const text = preview.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const copyBtn = document.getElementById('copyBtn');
+        const originalText = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<i class="fa fa-check mr-1"></i> 已复制';
+        setTimeout(() => {
+          copyBtn.innerHTML = originalText;
+        }, 2000);
+      }).catch(err => {
+        alert('复制失败：' + err);
+      });
+    }
+
+    // 保存配置到 LocalStorage（支持多预设）
+    function saveToLocalStorage(presetName = null) {
+      const currentPreset = presetName || localStorage.getItem('currentPreset') || 'default';
+
+      // 获取已有的所有预设配置
+      let allPresets = JSON.parse(localStorage.getItem('envPresets') || '{}');
+
+      // 保存当前预设的配置
+      allPresets[currentPreset] = {
+        fileName: document.getElementById('fileName').value,
+        data: {}
+      };
+
+      // 保存所有普通配置项
+      configItems.forEach(key => {
+        const input = document.getElementById(key);
+        if (input) {
+          allPresets[currentPreset].data[key] = input.value;
+        }
+      });
+
+      // 保存所有链接配置
+      allPresets[currentPreset].data.links = [];
+      document.querySelectorAll('.link-row').forEach(row => {
+        allPresets[currentPreset].data.links.push({
+          icon: row.querySelector('.link-icon').value,
+          title: row.querySelector('.link-title').value,
+          url: row.querySelector('.link-url').value
+        });
+      });
+
+      localStorage.setItem('envPresets', JSON.stringify(allPresets));
+      localStorage.setItem('currentPreset', currentPreset);
+    }
+
+    // 加载指定预设的配置
+    function loadPresetConfig(presetName) {
+      const allPresets = JSON.parse(localStorage.getItem('envPresets') || '{}');
+      return allPresets[presetName] || null;
+    }
+
+    // 保存当前所有配置（包括普通项和链接）
+    function saveCurrentConfig() {
+      saveToLocalStorage();
+    }
+
+    // 从 LocalStorage 加载配置（支持多预设）
+    function loadFromLocalStorage() {
+      const currentPreset = localStorage.getItem('currentPreset') || 'default';
+      const config = loadPresetConfig(currentPreset);
+
+      if (!config) return false;
+
+      try {
+        // 加载文件名
+        if (config.fileName) {
+          document.getElementById('fileName').value = config.fileName;
+        }
+
+        // 加载所有配置数据
+        if (config.data) {
+          Object.keys(config.data).forEach(key => {
+            if (key === 'links') return;
+            const input = document.getElementById(key);
+            if (input) {
+              input.value = config.data[key];
+            }
+          });
+        }
+
+        // 加载链接配置
+        if (config.data && config.data.links && config.data.links.length > 0) {
+          const linksContainer = document.getElementById('linksContainer');
+          linksContainer.innerHTML = '';
+
+          config.data.links.forEach(link => {
+            const newRow = document.createElement('div');
+            newRow.className = 'link-row';
+            newRow.innerHTML = `
+            <div class="link-row-input">
+              <label class="form-label-required">emoji图标</label>
+              <p class="form-hint">如😀🙃</p>
+              <input type="text" class="form-input link-icon" value="${link.icon || ''}">
+              <p class="error-text link-icon-error">请填写emoji图标</p>
+            </div>
+            <div class="link-row-input">
+              <label class="form-label-required">链接标题</label>
+              <p class="form-hint">链接的显示标题，例如：使用文档</p>
+              <input type="text" class="form-input link-title" value="${link.title || ''}">
+              <p class="error-text link-title-error">请填写链接标题</p>
+            </div>
+            <div class="link-row-input">
+              <label class="form-label-required">链接地址</label>
+              <p class="form-hint">链接的URL地址，例如：https://docs.example.com</p>
+              <input type="text" class="form-input link-url" value="${link.url || ''}">
+              <p class="error-text link-url-error">请填写链接地址</p>
+            </div>
+            <button type="button" class="btn btn-danger delete-row" style="padding: 0.5rem 1rem;">
+              <i class="fa fa-trash"></i>
+            </button>
+          `;
+            linksContainer.appendChild(newRow);
+
+            // 绑定删除事件
+            newRow.querySelector('.delete-row').addEventListener('click', function () {
+              if (document.querySelectorAll('.link-row').length > 1) {
+                newRow.remove();
+                updatePreview();
+                saveToLocalStorage();
+              } else {
+                alert('至少需要保留一行链接配置');
+              }
+            });
+
+            // 绑定输入事件
+            bindLinkRowInputEvents(newRow);
+          });
+
+          // 重新绑定所有删除事件
+          bindDeleteRowEvents();
+        }
+
+        return true;
+      } catch (e) {
+        console.error('加载配置失败:', e);
+        return false;
+      }
+    }
+
+    // 保存配置（手动保存到 LocalStorage）
+    function saveConfig() {
+      // 获取当前预设名称
+      const currentPreset = localStorage.getItem('currentPreset');
+
+      // 保存所有配置到 LocalStorage（带预设标记）
+      saveToLocalStorage(currentPreset);
+
+      // 清除 URL 中的 preset 参数
+      const url = new URL(window.location);
+      url.searchParams.delete('preset');
+      window.history.replaceState({}, '', url);
+
+      // 显示保存成功提示
+      const saveBtn = document.getElementById('saveBtn');
+      const originalText = saveBtn.innerHTML;
+      saveBtn.innerHTML = '<i class="fa fa-check mr-1"></i> 已保存';
+      setTimeout(() => {
+        saveBtn.innerHTML = originalText;
+      }, 2000);
+    }
+
+    // 重置表单
+    function resetForm() {
+      if (confirm('确定要重置所有配置项吗？')) {
+        // 清除 LocalStorage
+        localStorage.removeItem('envPresets');
+        localStorage.removeItem('currentPreset');
+
+        // 重置普通配置项
+        configItems.forEach(key => {
+          const input = document.getElementById(key);
+          if (!input) return;
+
+          // 保留默认值
+          if (key === 'VITE_UL_CONF_URL') input.value = 'http://localhost:3000';
+          else if (key === 'VITE_APP_ICON') input.value = 'image/icon.png';
+          else input.value = '';
+
+          // 清除错误样式
+          input.classList.remove('form-input-error');
+          const errorText = document.getElementById(`${key}_error`);
+          if (errorText) errorText.classList.remove('show');
+        });
+
+        // 重置链接配置区
+        const linksContainer = document.getElementById('linksContainer');
+        linksContainer.innerHTML = `
+          <div class="link-row">
+            <div class="link-row-input">
+              <label class="form-label-required">图标类名</label>
+              <p class="form-hint">Font Awesome图标类名，例如：fa fa-book</p>
+              <input type="text" class="form-input link-icon" value="fa fa-book">
+              <p class="error-text link-icon-error">请填写图标类名</p>
+            </div>
+            <div class="link-row-input">
+              <label class="form-label-required">链接标题</label>
+              <p class="form-hint">链接的显示标题，例如：使用文档</p>
+              <input type="text" class="form-input link-title">
+              <p class="error-text link-title-error">请填写链接标题</p>
+            </div>
+            <div class="link-row-input">
+              <label class="form-label-required">链接地址</label>
+              <p class="form-hint">链接的URL地址，例如：https://docs.example.com</p>
+              <input type="text" class="form-input link-url">
+              <p class="error-text link-url-error">请填写链接地址</p>
+            </div>
+            <button type="button" class="btn btn-danger delete-row" style="padding: 0.5rem 1rem;">
+              <i class="fa fa-trash"></i>
+            </button>
+          </div>
+        `;
+        // 重新绑定删除行事件
+        bindDeleteRowEvents();
+        // 重新绑定链接行输入事件
+        bindAllLinkRowInputEvents();
+
+        document.getElementById('fileName').value = '.env';
+        updatePreview();
+      }
+    }
+
+    // 新增链接行
+    function addLinkRow() {
+      const linksContainer = document.getElementById('linksContainer');
+      const newRow = document.createElement('div');
+      newRow.className = 'link-row';
+      newRow.innerHTML = `
+        <div class="link-row-input">
+          <label class="form-label-required">emoji图标</label>
+          <p class="form-hint">如😀🙃</p>
+          <input type="text" class="form-input link-icon" value="fa fa-book">
+          <p class="error-text link-icon-error">请填写emoji图标/p>
+        </div>
+        <div class="link-row-input">
+          <label class="form-label-required">链接标题</label>
+          <p class="form-hint">链接的显示标题，例如：使用文档</p>
+          <input type="text" class="form-input link-title">
+          <p class="error-text link-title-error">请填写链接标题</p>
+        </div>
+        <div class="link-row-input">
+          <label class="form-label-required">链接地址</label>
+          <p class="form-hint">链接的URL地址，例如：https://docs.example.com</p>
+          <input type="text" class="form-input link-url">
+          <p class="error-text link-url-error">请填写链接地址</p>
+        </div>
+        <button type="button" class="btn btn-danger delete-row" style="padding: 0.5rem 1rem;">
+          <i class="fa fa-trash"></i>
+        </button>
+      `;
+      linksContainer.appendChild(newRow);
+
+      // 绑定新行的删除事件
+      newRow.querySelector('.delete-row').addEventListener('click', function () {
+        if (document.querySelectorAll('.link-row').length > 1) {
+          newRow.remove();
+          updatePreview();
+          saveToLocalStorage();
+        } else {
+          alert('至少需要保留一行链接配置');
+        }
+      });
+
+      // 绑定输入事件
+      bindLinkRowInputEvents(newRow);
+      updatePreview();
+      saveToLocalStorage();
+    }
+
+    // 绑定删除行事件
+    function bindDeleteRowEvents() {
+      document.querySelectorAll('.delete-row').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const row = this.closest('.link-row');
+          if (document.querySelectorAll('.link-row').length > 1) {
+            row.remove();
+            updatePreview();
+            saveToLocalStorage();
+          } else {
+            alert('至少需要保留一行链接配置');
+          }
+        });
+      });
+    }
+
+    // 绑定链接行输入事件
+    function bindLinkRowInputEvents(row) {
+      const inputs = row.querySelectorAll('input');
+      inputs.forEach(input => {
+        input.addEventListener('input', () => {
+          // 输入时清除当前输入框的错误提示
+          input.classList.remove('form-input-error');
+          const errorEl = input.nextElementSibling;
+          if (errorEl && errorEl.classList.contains('error-text')) {
+            errorEl.classList.remove('show');
+          }
+          updatePreview();
+          // 自动保存所有配置
+          saveToLocalStorage();
+        });
+      });
+    }
+
+    // 绑定所有链接行输入事件
+    function bindAllLinkRowInputEvents() {
+      document.querySelectorAll('.link-row').forEach(row => {
+        bindLinkRowInputEvents(row);
+      });
+    }
+
+    // 绑定事件
+    document.addEventListener('DOMContentLoaded', () => {
+      // 尝试从 LocalStorage 加载配置
+      const loadedFromStorage = loadFromLocalStorage();
+      if (loadedFromStorage) {
+        console.log('已从 LocalStorage 加载配置');
+      }
+
+      // 初始化预览
+      updatePreview();
+
+      // 监听普通配置项输入变化（自动保存）
+      configItems.forEach(key => {
+        const input = document.getElementById(key);
+        if (input && !input.hidden) {
+          input.addEventListener('input', () => {
+            updatePreview();
+            // 输入时清除对应错误提示
+            const errorText = document.getElementById(`${key}_error`);
+            if (errorText) {
+              input.classList.remove('form-input-error');
+              errorText.classList.remove('show');
+            }
+            // 自动保存所有配置
+            saveToLocalStorage();
+          });
+        }
+      });
+      document.getElementById('fileName').addEventListener('input', () => {
+        updatePreview();
+        saveToLocalStorage();
+      });
+
+      // 绑定链接配置区事件（如果从 LocalStorage 加载了配置，事件已在加载时绑定）
+      if (!loadedFromStorage) {
+        bindDeleteRowEvents();
+        bindAllLinkRowInputEvents();
+      }
+      document.getElementById('addLinkRow').addEventListener('click', addLinkRow);
+
+      // 绑定按钮事件
+      document.getElementById('copyBtn').addEventListener('click', copyConfig);
+      document.getElementById('saveBtn').addEventListener('click', saveConfig);
+      document.getElementById('resetBtn').addEventListener('click', resetForm);
+      document.getElementById('previewBtn').addEventListener('click', updatePreview); // 新增刷新预览按钮
+
+      // 绑定预设按钮事件
+      document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const presetName = this.dataset.preset;
+          if (confirm(`确定要加载「${this.textContent.trim()}」预设吗？当前配置将被覆盖。`)) {
+            loadPreset(presetName);
+            // 保存当前预设名称
+            localStorage.setItem('currentPreset', presetName);
+            // 清除 URL 中的 preset 参数（如果有）
+            const url = new URL(window.location);
+            if (url.searchParams.has('preset')) {
+              url.searchParams.delete('preset');
+              window.history.replaceState({}, '', url);
+            }
+          }
+        });
+      });
+
+      // 为所有必填项添加失去焦点校验
+      requiredFields.forEach(field => {
+        const input = document.getElementById(field.id);
+        if (input) {
+          input.addEventListener('blur', () => {
+            const value = input.value.trim();
+            const errorText = document.getElementById(`${field.id}_error`);
+
+            if (field.rule === 'required' && !value) {
+              input.classList.add('form-input-error');
+              errorText.textContent = field.message;
+              errorText.classList.add('show');
+            } else if (field.rule === 'email' && value) {
+              const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+              if (!emailRegex.test(value)) {
+                input.classList.add('form-input-error');
+                errorText.textContent = field.message;
+                errorText.classList.add('show');
+              }
+            }
+          });
+        }
+      });
+
+      // 为链接行输入框添加失去焦点校验
+      document.addEventListener('blur', function (e) {
+        if (e.target.classList.contains('link-icon') || e.target.classList.contains('link-title') || e.target.classList.contains('link-url')) {
+          const value = e.target.value.trim();
+          if (!value) {
+            e.target.classList.add('form-input-error');
+            const errorEl = e.target.nextElementSibling;
+            if (errorEl && errorEl.classList.contains('error-text')) {
+              errorEl.classList.add('show');
+            }
+          }
+        }
+      }, true);
+    });
+  </script>
+</body>
+
+</html>

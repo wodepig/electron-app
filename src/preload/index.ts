@@ -1,22 +1,177 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+// import { Conf } from 'electron-conf'
+// import { getAppDir } from '../main/utils'
+// import {getConfValue} from '../main/conf'
+// 添加调试日志
+
+/**
+ * 获取应用和作者信息
+ */
+const getAppInfos = () =>{
+  const auth = {
+    name: import.meta.env.VITE_AUTHOR_NAME || '作者',
+    email: import.meta.env.VITE_AUTHOR_EMAIL || '作者邮箱',
+    website: import.meta.env.VITE_APP_HOME || '作者网站',
+    wx: import.meta.env.VITE_AUTHOR_WX || '作者微信',
+    github: import.meta.env.VITE_APP_AUTHOR_GITHUB || '作者GitHub',
+    qrLabel: import.meta.env.VITE_AUTHOR_QRLABEL || '点击放大',
+    qrCode: import.meta.env.VITE_AUTHOR_WX_IMG || 'image/wx_qr.png'
+  }
+  let links = []
+  const linksStr = import.meta.env.VITE_APP_LINKS || ''
+  if (linksStr){
+    links = linksStr
+      .split(';')
+      .filter((link) => link.trim())
+      .map((link) => {
+        const parts = link.trim().split('|')
+        return {
+          name: parts[1] || '链接',
+          url: parts[2] || '#',
+          icon: parts[0] || '🔗'
+        }
+      })
+  }
+  return {
+    name: import.meta.env.VITE_APP_EXE_NAME || '应用名',
+    desc: import.meta.env.VITE_APP_DESC || '_',
+    icon: import.meta.env.VITE_APP_ICON || 'image/icon.png',
+    links: links,
+    auth: auth
+  }
+}
+// 获取系统版本信息
+const getSystemVersions = async () => {
+  const appVersion = await api.getConfValue({key:'distVersion',defaultValue:'1'})
+  const resp = {
+    platform: process.platform,
+    arch: process.arch,
+    language: navigator.language,
+    appVersion:  appVersion, // 可以从package.json获取实际版本
+    electronVersion: process.versions.electron,
+    chromeVersion: process.versions.chrome,
+    nodeVersion: process.versions.node
+  }
+  return resp
+}
+
+
 // Custom APIs for renderer
-const api = {}
+const api = {
+  // 记录日志
+  onUpdateLog: (callback: (log: string) => void) => {
+    ipcRenderer.on('log-message', (_event, value) => {
+      callback(value)
+    })
+  },
+
+  removeUpdateLogListener: () => {
+    console.log('removeUpdateLogListener called')
+    // 移除所有日志监听器
+    ipcRenderer.removeAllListeners('log-message')
+  },
+
+  // 监听最新日志
+  onLatestLog: (callback: (log: string) => void) => {
+    ipcRenderer.on('latest-log', (_event, value) => {
+      callback(value)
+    })
+  },
+
+  removeLatestLogListener: () => {
+    ipcRenderer.removeAllListeners('latest-log')
+  },
+
+  // 添加获取系统信息和版本信息的方法
+  getSystemVersions: ()=>{
+    return getSystemVersions()
+  },
+  // 获取应用的信息和作者信息
+  getAppInfos: getAppInfos,
+
+
+  getConfValue: (conf:{key: string,defaultValue?: any,nameSpace?:string}) => {
+    return ipcRenderer.invoke('get-conf-value', conf)
+  },
+  // 添加导航监听
+  onNavigate: (callback: (path: string) => void) => {
+    ipcRenderer.on('navigate-to', (_event, path) => callback(path))
+  },
+
+  removeNavigateListener: () => {
+    ipcRenderer.removeAllListeners('navigate-to')
+  },
+
+  onDownloadProgress: (callback: (payload: { visible: boolean; progress: number; isDownloading: boolean }) => void) => {
+    ipcRenderer.on('download-progress', (_event, payload) => callback(payload))
+  },
+
+  removeDownloadProgressListener: () => {
+    ipcRenderer.removeAllListeners('download-progress')
+  },
+
+  // 设置相关 API
+  getSettings: () => {
+    return ipcRenderer.invoke('get-settings')
+  },
+
+  saveSettings: (settings: { updateFrequency: string; startupActions: string[]; browserType?: string }) => {
+    return ipcRenderer.invoke('save-settings', settings)
+  },
+
+  // 重置设置
+  resetSettings: () => {
+    return ipcRenderer.invoke('reset-settings')
+  },
+
+
+  // 检查端口是否被占用
+  checkPortInUse: (port: number): Promise<{ success: boolean; inUse?: boolean; error?: string }> => {
+    return ipcRenderer.invoke('check-port-in-use', port)
+  },
+
+  // 监听初始化进度
+  onInitProgress: (callback: (payload: { progress: number; message: string }) => void) => {
+    ipcRenderer.on('init-progress', (_event, payload) => callback(payload))
+  },
+
+  removeInitProgressListener: () => {
+    ipcRenderer.removeAllListeners('init-progress')
+  },
+
+  // 监听应用通知
+  onAppNotification: (callback: (data: { id: string; type: 'info' | 'success' | 'warning' | 'error'; title: string; message: string; duration: number; timestamp: number }) => void) => {
+    ipcRenderer.on('app-notification', (_event, data) => callback(data))
+  },
+
+  removeAppNotificationListener: () => {
+    ipcRenderer.removeAllListeners('app-notification')
+  },
+
+  // 显示通知（触发主进程发送通知）
+  showNotification: async (type: 'info' | 'success' | 'warning' | 'error', title: string, message: string, duration?: number) => {
+    console.log('[Preload] 调用 showNotification:', { type, title, message, duration })
+    await ipcRenderer.invoke('show-notification', type, title, message, duration)
+    console.log('[Preload] showNotification 调用完成')
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
-    contextBridge.exposeInMainWorld('api', api)
-  } catch (error) {
-    console.error(error)
-  }
-} else {
+try {
+  console.log('Attempting to expose APIs via contextBridge...')
+  contextBridge.exposeInMainWorld('electron', electronAPI)
+  contextBridge.exposeInMainWorld('api', api)
+  console.log('Successfully exposed APIs via contextBridge')
+} catch (error) {
+  console.error('Failed to expose APIs via contextBridge:', error)
+  // Fallback to direct assignment
   // @ts-ignore (define in dts)
   window.electron = electronAPI
   // @ts-ignore (define in dts)
   window.api = api
+  console.log('Fallback: Direct assignment of APIs to window object')
 }

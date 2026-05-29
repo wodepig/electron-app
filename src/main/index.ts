@@ -1,113 +1,302 @@
-import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, session } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import log from 'electron-log/main'
+import { LogFileWatcher } from './utils/index'
+//@ts-ignore
+import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { startInitialize,deleteAppData, cleanupServerProcess, addLog2Vue, sendLatestLogToMainWindow, sleep, getAppDir,isPortInUse, sendInitProgress
+  ,setDownloadProgressCallback,sendDownloadProgress , type NotificationType} from './utils/index'
+import { getConfValue, setConfValue, clearConf, getEnvConf } from './utils/config'
+import { createMainWindow, ensureMenuCreated } from './utils/index'
 
-function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    autoHideMenuBar: false,
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
+
+// 设置下载进度回调（避免循环依赖）
+setDownloadProgressCallback((visible, progress, isDownloading) => {
+  sendDownloadProgress({ visible, progress, isDownloading })
+})
+
+const DEFAULT_SETTINGS = {
+  updateFrequency: 'onStart',
+  startupActions: [] as string[],
+  browserType: 'default'
+} as const
+
+export type DownloadProgressPayload = {
+  visible: boolean
+  progress: number
+  isDownloading: boolean
+}
+export let downloadProgressBuffer: DownloadProgressPayload[] = []
+export let isRendererReady = false
+
+let mainWindow: BrowserWindow | null = null
+let logWatcher: LogFileWatcher | null = null
+let initializationStarted = false
+
+// 监听日志
+const listingLog = async () =>{
+  isRendererReady = true
+  // 先清理旧的监听（避免重复监听）
+  if (logWatcher) {
+    log.info('[listingLog] 清理旧的日志监听器')
+    logWatcher.cleanup()
+  }
+  log.info('[listingLog] 创建新的日志监听器')
+  // 创建新的监听器实例
+  logWatcher = new LogFileWatcher(log.transports.file.getFile().path)
+
+  // 监听日志就绪事件（前50条日志）
+  logWatcher.on('logReady', (first50Logs) => {
+    first50Logs.forEach((msg: string) => {
+      addLog2Vue(msg)
+    })
   })
 
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+  // 监听新增日志事件
+  logWatcher.on('newLogs', (newLogs) => {
+    newLogs.forEach((msg: string) => {
+      addLog2Vue(msg)
+      // 向首页发送最新的一条日志
+      sendLatestLogToMainWindow(msg)
+    })
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
+  // 监听错误事件
+  logWatcher.on('error', (errorMsg) => {
+    addLog2Vue(errorMsg)
+    console.error('日志监听错误：', errorMsg)
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  // 初始化监听
+  await logWatcher.initWatch()
+}
+// 初始化程序
+const runInitialization = async () => {
+  if (initializationStarted) {
+    log.warn('[runInitialization] 初始化已在进行中，跳过重复调用')
+    return
+  }
+  initializationStarted = true
+  log.info('[runInitialization] 开始初始化')
+  try {
+  
+    await listingLog()
+    await sleep(200)
+    
+    await startInitialize()
+    log.info('[runInitialization] 初始化完成')
+  } catch (error) {
+    const errorMessage = `应用初始化失败: ${(error as Error).message}`
+    log.warn('应用初始化失败:', error)
+    dialog.showErrorBox('初始化错误', errorMessage)
   }
 }
+
+// 初始化日志配置
+function initLogConfig() {
+  // 渲染进程中的console.log都会被捕获 https://github.com/megahertz/electron-log/blob/master/docs/initialize.md
+  log.initialize({ spyRendererConsole: false })
+  log.transports.file.resolvePathFn = () => join(getAppDir(), 'logs/main.log')
+  // log.transports.file.maxSize = 124
+  log.warn('日志配置初始化成功')
+}
+
+// 应用退出时清理服务器进程
+app.on('before-quit', () => {
+  cleanupServerProcess()
+})
+
+// 窗口关闭时也清理
+app.on('window-all-closed', () => {
+  cleanupServerProcess()
+  if (process.platform !== 'darwin') {
+    app.quit()
+  }
+})
+
+// 进程退出时清理
+process.on('exit', () => {
+  cleanupServerProcess()
+})
+
+// 捕获未处理的异常和退出信号
+process.on('SIGINT', () => {
+  cleanupServerProcess()
+  process.exit(0)
+})
+
+process.on('SIGTERM', () => {
+  cleanupServerProcess()
+  process.exit(0)
+})
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+app.whenReady().then(async () => {
+  log.warn('when.whenReady')
+  console.log('when.whenReady')
+  // 跳过下载更新的地址
+  // app.commandLine.appendSwitch('proxy-bypass-list', '*.toolsetlink.com;*.qq.com')
+  // 初始化日志配置
+  initLogConfig()
+// try{
+  
+//   // 配置主窗口的 session，确保 cookies 能正常工作（解决 nuxt-auth-utils 等需要 session 的问题）
+//   const mainSession = session.fromPartition('persist:main')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
+//   // 启用持久化存储（初始化 session）
+//   await mainSession.clearStorageData({ storages: [] }) // 不清除任何内容，仅确保 session 初始化
+
+//   log.info('主 session 已配置：启用 cookie 持久化')
+// }catch(error){
+//   log.error('主 session 配置失败', error)
+// }
+
+
+  // 创建窗口
+  mainWindow = await createMainWindow()
+
+  // 等待窗口准备好后再处理
+  mainWindow?.once('ready-to-show', async () => {
+    sendInitProgress(10, '正在启动日志服务...')
+    log.info('主窗口 ready-to-show 事件触发（index.ts）')
+
+    // 先显示窗口
+    mainWindow?.show()
+    log.info('主窗口已显示')
+
+    // 延迟创建菜单（第二次尝试，兼容 mini-electron）
+    // 如果第一次已经创建成功，会被跳过
+    setTimeout(() => {
+      log.info('尝试创建菜单（第二次，延迟100ms）')
+      ensureMenuCreated(mainWindow)
+    }, 100)
+    // 检查electron更新(不可用)
+    // await checkElectronUpdrate()
+    // 开始初始化
+    await runInitialization()
+  })
+
+  // Set app user model id for windows
+  electronApp.setAppUserModelId(getEnvConf('VITE_APP_ID'))
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
-  // IPC handlers for menu actions
-  ipcMain.on('menu-about', () => {
-    const win = BrowserWindow.getFocusedWindow()
-    if (win) {
-      win.webContents.send('print-text', '关于')
+  ipcMain.on('log-list-close', async () => {
+    if (logWatcher) {
+      logWatcher.cleanup()
     }
   })
-
-  ipcMain.on('menu-options', () => {
-    const win = BrowserWindow.getFocusedWindow()
-    if (win) {
-      win.webContents.send('print-text', '选项')
-    }
+  // 监听日志列表准备好的信号
+  ipcMain.on('log-list-ready', async () => {
+    await listingLog()
   })
 
-  createWindow()
-
-  // Create application menu
-  const menuTemplate: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: '关于',
-      click: () => {
-        const win = BrowserWindow.getFocusedWindow()
-        if (win) {
-          win.webContents.send('menu-clicked', '关于')
-        }
-      }
-    },
-    {
-      label: '选项',
-      click: () => {
-        const win = BrowserWindow.getFocusedWindow()
-        if (win) {
-          win.webContents.send('menu-clicked', '选项')
-        }
+  // 保存设置
+  ipcMain.handle(
+    'get-conf-value',
+    (_event, conf: { key: string; defaultValue?: any; nameSpace?: string }) => {
+      try {
+        return getConfValue(conf.key, conf.defaultValue, conf.nameSpace)
+      } catch (error) {
+        return ''
       }
     }
-  ]
-
-  const menu = Menu.buildFromTemplate(menuTemplate)
-  Menu.setApplicationMenu(menu)
-
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  )
+  // 设置相关的 IPC 处理
+  // 获取设置
+  ipcMain.handle('get-settings', () => {
+    return {
+      updateFrequency: getConfValue(
+        'updateFrequency',
+        DEFAULT_SETTINGS.updateFrequency,
+        'settings'
+      ),
+      startupActions: getConfValue('startupActions', DEFAULT_SETTINGS.startupActions, 'settings'),
+      browserType: getConfValue('browserType', DEFAULT_SETTINGS.browserType, 'settings')
+    }
   })
-})
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  // 保存设置
+  ipcMain.handle(
+    'save-settings',
+    (
+      _event,
+      settings: { updateFrequency: string; startupActions: string[]; browserType?: string }
+    ) => {
+      try {
+        // 确保数据是可序列化的
+        const updateFrequency = String(settings.updateFrequency || 'onStart')
+        const startupActions = Array.isArray(settings.startupActions)
+          ? settings.startupActions.map(String)
+          : []
+        const browserType = String(settings.browserType || 'default')
+        setConfValue('updateFrequency', updateFrequency, 'settings')
+        setConfValue('startupActions', startupActions, 'settings')
+        setConfValue('browserType', browserType, 'settings')
+        return { success: true }
+      } catch (error) {
+        console.error('保存设置失败:', error)
+        return { success: false, error: (error as Error).message }
+      }
+    }
+  )
+
+  // 重置设置
+  ipcMain.handle('reset-settings', () => {
+    try {
+      log.info('重置设置')
+      clearConf('settings')
+      clearConf('common')
+      setConfValue('updateFrequency', DEFAULT_SETTINGS.updateFrequency, 'settings')
+      setConfValue('distVersion', '1')
+      setConfValue('startupActions', DEFAULT_SETTINGS.startupActions, 'settings')
+      setConfValue('browserType', DEFAULT_SETTINGS.browserType, 'settings')
+      deleteAppData()
+      return {
+        success: true,
+        settings: { ...DEFAULT_SETTINGS, startupActions: [...DEFAULT_SETTINGS.startupActions] }
+      }
+    } catch (error) {
+      console.error('重置设置失败:', error)
+      return { success: false, error: (error as Error).message }
+    }
+  })
+
+ 
+
+  // 显示通知
+  ipcMain.handle('show-notification', (event, type: NotificationType, title: string, message: string, duration?: number) => {
+    log.info(`[IPC] 收到显示通知请求: ${type} - ${title}`)
+    // 获取发送请求的窗口
+    const sender = event.sender
+    if (sender && !sender.isDestroyed()) {
+      sender.send('app-notification', {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        type,
+        title,
+        message,
+        duration: duration || 10000,
+        timestamp: Date.now()
+      })
+      log.info('[Notification] 通知已发送到调用窗口')
+    } else {
+      log.warn('[Notification] 调用窗口不存在，无法发送通知')
+    }
+  })
+
+  // 检查端口是否被占用
+  ipcMain.handle('check-port-in-use', async (_event, port: number) => {
+    try {
+      const inUse = await isPortInUse(port)
+      return { success: true, inUse }
+    } catch (error) {
+      return { success: false, error: (error as Error).message }
+    }
+  })
 })
 
 // In this file you can include the rest of your app's specific main process

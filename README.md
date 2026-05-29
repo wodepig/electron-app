@@ -1,45 +1,90 @@
-## 说明
+## 介绍
+Electron启动器, 用来下载Node项目并运行. 支持自动更新.
+框架使用的是[electron-vite](https://cn.electron-vite.org/guide/introduction.html)
+自动更新服务提供者: [UpgradeLink](http://upgrade.toolsetlink.com/)
+## 本地开发
+1. 安装依赖
+pnpm install
+2. 生成环境变量
+根据gen-env-config.html生成环境变量文件., 复制到.env文件中.
+3. 确保dist_server目录存在
+启动时程序检查dist_server是否存在, 如果不存在则解压dist.zip到dist_server目录下.
+如果存在就启动dist_server目录下的index.mjs文件.
+如果dist.zip不存在, 会通过https://api.upgrade.toolsetlink.com/v1/file/download?fileKey=${import.meta.env.VITE_UL_CONF_FILEKEY!}下载默认的dist.zip
+> 可以通过pnpm create nuxt 初始化一个项目, pnpm build 打包项目后, 压缩成dist.zip放到本项目根目录下
+4. 启动
+pnpm dev
+默认打开electron窗口, 初始化会价值
 
-用来测试electron-vite和mini-electron的兼容问题.
 
-| 日期       | 变动     | mb版本                 | 结果         | 备注     |
-| -------- | ------ | -------------------- | ---------- | ------ |
-| 26年5月29日 | 空白项目   | miniblink132\_260528 | 成功, 菜单栏没问题 | 无      |
-| <br />   | <br /> | <br />               | <br />     | <br /> |
-# electron-app
+`/src/main/index.ts/runInitialization`是入口函数
 
-An Electron application with Vue and TypeScript
 
-## Recommended IDE Setup
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
 
-## Project Setup
+**下载electron失败**
+如果在下载electron失败, 可能是网络问题. 请检查网络是否正常, 或者使用代理下载.clash开虚拟网卡+代理.
+可以单独运行 node node_modules\electron\install.js(未测试)
 
-### Install
 
-```bash
-$ pnpm install
+
+
+## 使用
+Nuxt或Next全栈项目开发后, 打包并构建. 然后把构建物上传到UpgradeLink的文件升级服务中.
+根据环境变量配置应用的信息.
+## 配置
+根据.env.example设置应用的信息, 配置如下:
+```
+VITE_UL_CONF_AK=UpgradeLink的AK
+VITE_UL_CONF_SK=UpgradeLinkSK
+VITE_UL_CONF_FILEKEY=UpgradeLink的FileKey(文件升级)
+VITE_UL_CONF_URL=启动项目后要打开的地址(默认http://localhost:3000)
+VITE_APP_NAME=应用名
+VITE_APP_DESC=应用描述
+VITE_APP_ID=com.electron.app
+VITE_APP_ICON=应用的图标和icon,如:image/app.png
+VITE_APP_HOME=应用主页
+VITE_APP_LINKS=应用的相关链接,如: 使用文档|https://链接1|😁;视频教程|https://链接2|😗;讨论区|链接3
+VITE_AUTHOR_NAME=作者名
+VITE_AUTHOR_WX=作者微信
+VITE_AUTHOR_WX_IMG=微信二维码,如:image/wx.png
+VITE_AUTHOR_EMAIL=邮箱
+VITE_ADMIN_PASSWORD=打开开发者工具的密码, 默认admin123
+
 ```
 
-### Development
+### 设置图标
+图标获取可以谷歌搜: 软件名 logo circle png .我用的: https://www.vecteezy.com/png
 
-```bash
-$ pnpm dev
-```
+需要注意的是,VITE_APP_ICON和VITE_AUTHOR_WX_IMG对应的图片最好在<rootDiv>/resources下和<rootDir>/src/renderer/src/assets下各有一份.
+变量值请不要以/开头, 直接写对应路径
 
-### Build
+原因请看: https://cn.electron-vite.org/guide/assets
 
-```bash
-# For windows
-$ pnpm build:win
+相关代码: Home.vue的logoIconUrl() About.vue的qrCodeUrl()
+AI写的
 
-# For macOS
-$ pnpm build:mac
-
-# For Linux
-$ pnpm build:linux
-```
-
-
-
+## 打包
+1. 创建配置文件
+使用[gen-env-config.html](gen-env-config.html)生成配置文件, 并放到.env.demo中
+2. 打包
+build:win:mode 打包windows下的zip包
+"build:win:mode": "node scripts/build-with-mode.js demo win"
+输出位置: /dist目录
+打包.env.demo的环境变量. 会在打包前执行scripts/build-with-mode.js替换electron-builder.yml的部分字段然后打包成zip包
+相关的配置在electron-builder.yml中.默认打包为zip压缩包. 下载后解压即可使用
+3. mini-electron
+在electron-builder.yml中添加electronDist: D:\\soft\\electron
+compression: maximum会花费很长时间构建(比normal多3倍的时间), 但打包后的zip包大小没变化
+## 打包后
+1. 删除了多余的语言
+scripts/cleanup-locales.js
+2. 复制run-with-log.bat到dist目录下
+afterExtract: scripts/copy-run-script.js
+3. 创建快捷方式
+afterExtract: scripts/copy-run-script.js
+## 主题生成器
+src\renderer\src\config\theme-generator.html
+## 方法说明
+主线程中使用log.xxx记录日志到文件中.
+addlog2vue是把日志放到日志组件中, 方便查看.
