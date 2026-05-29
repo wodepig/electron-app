@@ -135,11 +135,12 @@ process.on('SIGTERM', () => {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   log.warn('when.whenReady')
-  console.log('when.whenReady')
   // 跳过下载更新的地址
   // app.commandLine.appendSwitch('proxy-bypass-list', '*.toolsetlink.com;*.qq.com')
   // 初始化日志配置
+  log.warn('before initLogConfig')
   initLogConfig()
+  log.warn('after initLogConfig')
 // try{
   
 //   // 配置主窗口的 session，确保 cookies 能正常工作（解决 nuxt-auth-utils 等需要 session 的问题）
@@ -155,50 +156,68 @@ app.whenReady().then(async () => {
 
 
   // 创建窗口
+  log.warn('before createMainWindow')
   mainWindow = await createMainWindow()
+  log.warn('after createMainWindow')
 
   // 等待窗口准备好后再处理
   mainWindow?.once('ready-to-show', async () => {
-    sendInitProgress(10, '正在启动日志服务...')
+    log.info('mainWindow ready-to-show 事件触发（index.ts）')
+    log.warn('mainWindow ready-to-show')
+    // sendInitProgress(10, '正在启动日志服务...')
     log.info('主窗口 ready-to-show 事件触发（index.ts）')
 
     // 先显示窗口
+    log.warn('before mainWindow show')
     mainWindow?.show()
+    log.warn('after mainWindow show')
     log.info('主窗口已显示')
 
     // 延迟创建菜单（第二次尝试，兼容 mini-electron）
     // 如果第一次已经创建成功，会被跳过
+    log.warn('before setTimeout ensureMenuCreated')
     setTimeout(() => {
+      log.warn('setTimeout ensureMenuCreated callback')
       log.info('尝试创建菜单（第二次，延迟100ms）')
       ensureMenuCreated(mainWindow)
     }, 100)
+    log.warn('after setTimeout ensureMenuCreated')
     // 检查electron更新(不可用)
     // await checkElectronUpdrate()
     // 开始初始化
+    log.warn('before runInitialization')
     await runInitialization()
+    log.warn('after runInitialization')
   })
 
   // Set app user model id for windows
+  log.warn('before setAppUserModelId')
   electronApp.setAppUserModelId(getEnvConf('VITE_APP_ID'))
+  log.warn('after setAppUserModelId')
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
+    log.warn('browser-window-created')
     optimizer.watchWindowShortcuts(window)
   })
 
   ipcMain.on('log-list-close', async () => {
+    log.warn('ipc log-list-close')
     if (logWatcher) {
       logWatcher.cleanup()
     }
   })
   // 监听日志列表准备好的信号
   ipcMain.on('log-list-ready', async () => {
+    log.warn('ipc log-list-ready')
     await listingLog()
   })
 
   // 保存设置
+  log.warn('register ipc get-conf-value')
   ipcMain.handle(
     'get-conf-value',
     (_event, conf: { key: string; defaultValue?: any; nameSpace?: string }) => {
+      log.warn('ipc get-conf-value called')
       try {
         return getConfValue(conf.key, conf.defaultValue, conf.nameSpace)
       } catch (error) {
@@ -208,7 +227,9 @@ app.whenReady().then(async () => {
   )
   // 设置相关的 IPC 处理
   // 获取设置
+  log.warn('register ipc get-settings')
   ipcMain.handle('get-settings', () => {
+    log.warn('ipc get-settings called')
     return {
       updateFrequency: getConfValue(
         'updateFrequency',
@@ -221,12 +242,14 @@ app.whenReady().then(async () => {
   })
 
   // 保存设置
+  log.warn('register ipc save-settings')
   ipcMain.handle(
     'save-settings',
     (
       _event,
       settings: { updateFrequency: string; startupActions: string[]; browserType?: string }
     ) => {
+      log.warn('ipc save-settings called')
       try {
         // 确保数据是可序列化的
         const updateFrequency = String(settings.updateFrequency || 'onStart')
@@ -246,7 +269,9 @@ app.whenReady().then(async () => {
   )
 
   // 重置设置
+  log.warn('register ipc reset-settings')
   ipcMain.handle('reset-settings', () => {
+    log.warn('ipc reset-settings called')
     try {
       log.info('重置设置')
       clearConf('settings')
@@ -269,7 +294,9 @@ app.whenReady().then(async () => {
  
 
   // 显示通知
+  log.warn('register ipc show-notification')
   ipcMain.handle('show-notification', (event, type: NotificationType, title: string, message: string, duration?: number) => {
+    log.warn('ipc show-notification called')
     log.info(`[IPC] 收到显示通知请求: ${type} - ${title}`)
     // 获取发送请求的窗口
     const sender = event.sender
@@ -289,7 +316,9 @@ app.whenReady().then(async () => {
   })
 
   // 检查端口是否被占用
+  log.warn('register ipc check-port-in-use')
   ipcMain.handle('check-port-in-use', async (_event, port: number) => {
+    log.warn('ipc check-port-in-use called')
     try {
       const inUse = await isPortInUse(port)
       return { success: true, inUse }
@@ -297,6 +326,7 @@ app.whenReady().then(async () => {
       return { success: false, error: (error as Error).message }
     }
   })
+  log.warn('app.whenReady end')
 })
 
 // In this file you can include the rest of your app's specific main process

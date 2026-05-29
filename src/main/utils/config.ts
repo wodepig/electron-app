@@ -108,10 +108,14 @@ export const loadEnvFile = (): void => {
  * @returns 环境变量值
  */
 export const getEnvConf = (key: string, defaultValue: string = 'default'): string => {
+  log.info(`getEnvConf: ${key}, ${defaultValue}`)
+  log.info(`import.meta.env: ${JSON.stringify(import.meta.env)}`)
   const value = import.meta.env[key]
   if (value) {
+    log.info(`环境变量 ${key} 存在，值为 ${value}`)
     return value
   }
+  log.info(`环境变量 ${key} 不存在，使用默认值 ${defaultValue}`)
   return defaultValue
 }
 

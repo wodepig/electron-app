@@ -53,24 +53,45 @@ const isMainWindow = (name: string): boolean => name === MAIN_WINDOW_NAME
  * 获取主窗口实例（带缓存）
  */
 export const getMainWindow = (): BrowserWindow | undefined => {
+  // log.info('getMainWindow 调用')
   const now = Date.now()
   if (cachedMainWindow && !cachedMainWindow.isDestroyed() && (now - lastCacheTime) < CACHE_TTL) {
     return cachedMainWindow
   }
+     BrowserWindow.getAllWindows().forEach(win => {
+    log.info(JSON.stringify(win))
+    // log.info(`win: ${win.getTitle()}, isDestroyed: ${win.isDestroyed()}, getParentWindow: ${win.getParentWindow()}`)
+   })
+  log.info('缓存过期，开始获取主窗口')
+  log.info(`MAIN_WINDOW_NAME: ${MAIN_WINDOW_NAME}`)
 
-  const windowByTitle = getWindowsByTitle(MAIN_WINDOW_NAME)
+  let windowByTitle = getWindowsByTitle(MAIN_WINDOW_NAME)
+  log.info(`windowByTitle: ${windowByTitle}`)
+
+  if (!windowByTitle) {
+    if(BrowserWindow.getAllWindows().length === 1){
+      windowByTitle = BrowserWindow.getAllWindows()[0]
+    }
+      // windowByTitle = getWindowsByTitle('electron')
+      log.info(`取默认的呢: ${windowByTitle}`)
+  }
   if (windowByTitle && !windowByTitle.isDestroyed()) {
     cachedMainWindow = windowByTitle
     lastCacheTime = now
+    log.info('获取到窗口通过标题的主窗口')
     return windowByTitle
   }
+  log.info('未通过标题获取到主窗口，尝试通过 getAllWindows() 获取')
+  log.info(`getAllWindows(): ${BrowserWindow.getAllWindows().length}`)
 
   const mainWindow = BrowserWindow.getAllWindows().find(win =>
     !win.isDestroyed() && !win.getParentWindow()
   )
-
+  log.info(`mainWindow: ${mainWindow}`)
+  
   cachedMainWindow = mainWindow
   lastCacheTime = now
+  log.info('获取到窗口通过 getAllWindows() 的主窗口')
   return mainWindow
 }
 
@@ -213,6 +234,7 @@ const createContextMenu = (mainWindow: BrowserWindow) => Menu.buildFromTemplate(
  * 创建主窗口
  */
 export const createMainWindow = async (): Promise<BrowserWindow | null> => {
+
   const mainWindow = await createWindows(MAIN_WINDOW_NAME, null, false)
   if (!mainWindow) return null
 
@@ -285,6 +307,7 @@ export const createWindows = async (
   parent?: BrowserWindow | null,
   autoShow = true
 ): Promise<BrowserWindow | undefined> => {
+  log.info(`创建窗口 ${name}`)
   const existsWindow = getWindowsByTitle(name)
   if (existsWindow) {
     existsWindow.focus()
@@ -537,6 +560,7 @@ export const sendLatestLogToMainWindow = (msg: string): void => {
 
 export const sendInitProgress = (progress: number, message: string): void => {
   const mainWindow = getMainWindow()
+  log.info(`sendInitProgress: ${progress}, ${message}`)
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('init-progress', { progress, message })
   }
