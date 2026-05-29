@@ -6,6 +6,9 @@
 | -------- | ------ | -------------------- | ---------- | ------ |
 | 26年5月29日 | 空白项目   | miniblink132\_260528 | 成功, 菜单栏没问题 | 无      |
 | <br />   | <br /> | <br />               | <br />     | <br /> |
+
+
+electron-app\node_modules\electron\dist
 # electron-app
 
 An Electron application with Vue and TypeScript

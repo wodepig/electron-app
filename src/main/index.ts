@@ -8,6 +8,7 @@ function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
+    title: 'hello',
     show: false,
     autoHideMenuBar: false,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -17,6 +18,7 @@ function createWindow(): void {
     }
   })
 
+  mainWindow.setTitle('222')
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
