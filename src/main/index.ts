@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { randomUUID } from 'crypto'
 
 function createWindow(): void {
   // Create the browser window.
@@ -18,7 +19,7 @@ function createWindow(): void {
     }
   })
 
-  mainWindow.setTitle('222')
+  // mainWindow.setTitle('222')
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -61,7 +62,6 @@ app.whenReady().then(() => {
       win.webContents.send('print-text', '关于')
     }
   })
-
   ipcMain.on('menu-options', () => {
     const win = BrowserWindow.getFocusedWindow()
     if (win) {
@@ -79,6 +79,17 @@ app.whenReady().then(() => {
         const win = BrowserWindow.getFocusedWindow()
         if (win) {
           win.webContents.send('menu-clicked', '关于')
+        }
+      }
+    },
+    {
+      label: '切换标题',
+      click: () => {
+        const win = BrowserWindow.getFocusedWindow()
+        if (win) {
+          const newTitle = randomUUID().substring(0, 4)
+          win.setTitle(newTitle)
+          win.webContents.send('menu-clicked', `切换标题: ${newTitle}`)
         }
       }
     },

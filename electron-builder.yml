@@ -43,3 +43,4 @@ npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates
+afterExtract: scripts/copy-run-script.js
