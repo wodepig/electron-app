@@ -3,6 +3,8 @@ import AuthorInfo from '../components/AuthorInfo.vue'
 import VersionInfo from '../components/VersionInfo.vue'
 import { theme } from '@renderer/config/theme.config'
 
+document.title = '关于'
+
 // 主题配置
 const { bg, component, layout } = theme
 </script>

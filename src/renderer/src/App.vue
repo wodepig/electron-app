@@ -7,7 +7,6 @@
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ToastNotification from './components/ToastNotification.vue'
-
 const router = useRouter()
 
 // 监听来自主进程的导航请求

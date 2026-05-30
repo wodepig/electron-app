@@ -138,6 +138,7 @@ const createWindowConfig = (name: string, parent?: BrowserWindow | null): Electr
     show: false,
     autoHideMenuBar: !isMain,
     resizable: true,
+    title: name,
     icon: join(__dirname, getIconPath()),
     minimizable: true,
     maximizable: true,
@@ -158,8 +159,16 @@ const createWindowConfig = (name: string, parent?: BrowserWindow | null): Electr
  * 注册窗口事件
  */
 const setupWindowEventListeners = (win: BrowserWindow, name: string, autoShow: boolean, parent?: BrowserWindow | null): void => {
-  win.once('ready-to-show', () => {
+    // 在 dom-ready 时设置标题，确保在页面内容加载前设置
+  win.webContents.once('dom-ready', () => {
+    log.info(`子窗口 ${name} DOM 已就绪`)
     win.setTitle(name)
+    // 同时通过 executeJavaScript 设置 document.title 防止被覆盖
+    win.webContents.executeJavaScript(`document.title = '${name}'`).catch(() => {})
+    log.info(`子窗口 ${name} 标题: ${win.getTitle()}`)
+  })
+  win.once('ready-to-show', () => {
+    // win.setTitle(name)
     resetWindowsSizeAndPosition(win, name)
 
     if (autoShow) {

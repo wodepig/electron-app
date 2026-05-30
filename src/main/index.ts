@@ -186,7 +186,7 @@ app.whenReady().then(async () => {
     // await checkElectronUpdrate()
     // 开始初始化
     log.warn('before runInitialization')
-    await runInitialization()
+    // await runInitialization()
     log.warn('after runInitialization')
   })
 
