@@ -165,7 +165,7 @@ const setupWindowEventListeners = (win: BrowserWindow, name: string, autoShow: b
     win.setTitle(name)
     // 同时通过 executeJavaScript 设置 document.title 防止被覆盖
     win.webContents.executeJavaScript(`document.title = '${name}'`).catch(() => {})
-    log.info(`子窗口 ${name} 标题: ${win.getTitle()}`)
+    log.info(`子窗口 ${name} 标题: ${win.getTitle().replace(/[\x00-\x1F\x7F\s]+/g, '') }`)
   })
   win.once('ready-to-show', () => {
     // win.setTitle(name)
@@ -335,7 +335,7 @@ export const createWindows = async (
  * 根据标题获取窗口
  */
 export const getWindowsByTitle = (titleName: string): BrowserWindow | undefined =>
-  BrowserWindow.getAllWindows().find(win => win.getTitle() === titleName)
+  BrowserWindow.getAllWindows().find(win => win.getTitle().replace(/[\x00-\x1F\x7F\s]+/g, '') === titleName)
 
 /**
  * 刷新窗口

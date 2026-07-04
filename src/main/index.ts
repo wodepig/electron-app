@@ -1,3 +1,6 @@
+// 抑制 Node.js 废弃警告（来自某些依赖包的 Buffer() 废弃警告）
+process.env.NODE_NO_WARNINGS = '1'
+
 import { app, BrowserWindow, ipcMain, dialog, session } from 'electron'
 import { join } from 'path'
 import log from 'electron-log/main'

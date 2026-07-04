@@ -7,6 +7,7 @@
 | 26年5月29日 | 空白项目        | miniblink132\_260528 | 成功, 菜单栏没问题 | 无  |
 | 26年5月29日 | 迁移源项目,dev分支 | miniblink132\_260528 | 失败         | 无  |
 | 26年5月30日 | 迁移源项目,dev分支 | miniblink132\_260528 | 失败         | 无法设置窗口标题  |
+| 26年7月4日 | 迁移源项目,dev分支 | miniblink132_260622 | 失败         | 标题没事但是打开无内容  |
 
 指定minielectron: 在electron-builder.yml中指定electronDist: D:\\soft\\electron
 打包命令: pnpm build:win:mode
