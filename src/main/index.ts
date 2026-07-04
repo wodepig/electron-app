@@ -19,7 +19,7 @@ function createWindow(): void {
     }
   })
 
-  // mainWindow.setTitle('222')
+  mainWindow.setTitle('222')
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
