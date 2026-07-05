@@ -288,11 +288,14 @@ export const ensureMenuCreated = (mainWindow: BrowserWindow | null): void => {
  * 加载窗口路由
  */
 const loadWindowRoute = (win: BrowserWindow, pageUrl: string): void => {
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${pageUrl}`)
-    return
-  }
+  // log.info(`第一行_加载窗口路由_zoal ${__dirname.toString()},${pageUrl.toString()}`)
+  // if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  //   log.info(`dev环境加载窗口路由_ialx ${__dirname.toString()},${pageUrl.toString()}`)
+  //   win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}#${pageUrl}`)
+  //   return
+  // }
 
+  log.info(`加载窗口路由_ialx ${__dirname.toString()},${pageUrl.toString()}`)
   const htmlPath = join(__dirname, '../renderer/index.html')
   win.loadFile(htmlPath, { hash: pageUrl }).catch(() => {
     // 降级方案：通过JS设置路由
@@ -324,9 +327,13 @@ export const createWindows = async (
   }
 
   const win = new BrowserWindow(createWindowConfig(name, parent))
+  log.info(`设置事件监听 ${name}`)
   setupWindowEventListeners(win, name, autoShow, parent)
+  log.info(`加载窗口路由_1475 ${name}`)
+  win.webContents.openDevTools()
   loadWindowRoute(win, getWindowRoute(name))
 
+  win.webContents.openDevTools()
   if (is.dev) win.webContents.openDevTools()
   return win
 }
